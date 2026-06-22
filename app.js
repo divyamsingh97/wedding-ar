@@ -6,12 +6,12 @@ import { USDZExporter } from 'three/addons/exporters/USDZExporter.js';
    1. EDIT YOUR WEDDING DETAILS HERE
    ===================================================================== */
 const CONFIG = {
-  name1: 'Alex',
-  name2: 'Jordan',
-  dateText: 'September 12, 2026',
-  venue: 'Sunset Garden Estate',
+  name1: 'Kripi',
+  name2: 'Divyam',
+  dateText: 'November 21, 2026',
+  venue: 'Best Western RCC, Manesar',
   rsvpUrl: 'https://example.com/rsvp',            // ← your RSVP form / site
-  mapUrl: 'https://maps.google.com/?q=Sunset+Garden+Estate', // ← venue map
+  mapUrl: 'https://maps.app.goo.gl/1Xyc7q2JGZDbqmN28', // ← venue map
   musicUrl: '',   // ← optional: path to an .mp3 (e.g. './music.mp3'). Leave '' to use built-in soft chimes.
   theme: {
     rose: 0xd98a96,
