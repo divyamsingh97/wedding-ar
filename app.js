@@ -5,10 +5,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
    1. EDIT YOUR WEDDING DETAILS HERE
    ===================================================================== */
 const CONFIG = {
-  name1: 'Alex',
-  name2: 'Jordan',
-  dateText: 'September 12, 2026',
-  venue: 'Sunset Garden Estate',
+  name1: 'Divyam',
+  name2: 'Kripi',
+  dateText: 'November 21, 2026',
+  venue: 'Best Western Resort Country Club, Manesar',
   rsvpUrl: 'https://example.com/rsvp',            // ← your RSVP form / site
   mapUrl: 'https://maps.google.com/?q=Sunset+Garden+Estate', // ← venue map
   musicUrl: '',   // ← optional: path to an .mp3 (e.g. './music.mp3'). Leave '' to use built-in soft chimes.
