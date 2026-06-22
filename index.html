@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>You're Invited — AR Wedding Invitation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,500&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --blush: #f7e7e9;
+      --rose: #d98a96;
+      --deep: #7a2e3a;
+      --gold: #c9a55c;
+      --ink: #2b2326;
+      --cream: #fbf6f1;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      font-family: 'Montserrat', system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--cream);
+    }
+
+    #app { position: fixed; inset: 0; }
+
+    canvas { display: block; }
+
+    /* ---------- Landing screen ---------- */
+    #landing {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 28px;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #fff 0%, transparent 60%),
+        linear-gradient(160deg, var(--blush) 0%, var(--cream) 55%, #f3e6dd 100%);
+      z-index: 10;
+      transition: opacity 0.6s ease;
+    }
+
+    #landing .eyebrow {
+      letter-spacing: 0.42em;
+      text-transform: uppercase;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--rose);
+      margin-bottom: 18px;
+    }
+
+    #landing h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 600;
+      font-size: clamp(38px, 11vw, 72px);
+      line-height: 1.02;
+      margin: 0;
+      color: var(--deep);
+    }
+
+    #landing h1 .amp {
+      display: block;
+      font-style: italic;
+      font-size: 0.5em;
+      color: var(--gold);
+      margin: 6px 0;
+    }
+
+    #landing .date {
+      margin-top: 18px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(18px, 5.2vw, 26px);
+      letter-spacing: 0.08em;
+      color: var(--ink);
+    }
+
+    #landing .venue {
+      margin-top: 4px;
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--rose);
+    }
+
+    .divider {
+      width: 64px;
+      height: 1px;
+      background: var(--gold);
+      margin: 26px 0;
+      position: relative;
+    }
+    .divider::before {
+      content: "❦";
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--gold);
+      font-size: 16px;
+      background: transparent;
+    }
+
+    .btn {
+      appearance: none;
+      border: none;
+      cursor: pointer;
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      font-size: 14px;
+      padding: 16px 34px;
+      border-radius: 999px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--rose), var(--deep));
+      box-shadow: 0 10px 30px rgba(122, 46, 58, 0.35);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn:active { transform: translateY(2px) scale(0.99); box-shadow: 0 6px 18px rgba(122,46,58,0.3); }
+    .btn[disabled] { opacity: 0.55; cursor: not-allowed; }
+
+    .btn .icon { font-size: 18px; }
+
+    #subnote {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #8a7b7e;
+      max-width: 320px;
+      line-height: 1.5;
+    }
+
+    #preview-hint {
+      margin-top: 8px;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--rose);
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+
+    /* ---------- AR DOM overlay (shown during AR session) ---------- */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 20;
+      display: none;
+      font-family: 'Montserrat', sans-serif;
+    }
+
+    #ar-hint {
+      position: absolute;
+      top: 26px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(43, 35, 38, 0.62);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 999px;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      max-width: 86vw;
+      text-align: center;
+      transition: opacity 0.4s;
+    }
+
+    #ar-actions {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: max(24px, env(safe-area-inset-bottom));
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 0 16px;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+    #ar-actions.show { opacity: 1; transform: translateY(0); }
+
+    .pill {
+      pointer-events: auto;
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.16);
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      font-size: 13px;
+      padding: 12px 18px;
+      border-radius: 999px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .pill:active { background: rgba(255,255,255,0.3); }
+    .pill.primary { background: linear-gradient(135deg, var(--rose), var(--deep)); border-color: transparent; }
+    .pill.exit { background: rgba(20,16,18,0.5); }
+
+    #ar-exit {
+      pointer-events: auto;
+      position: absolute;
+      top: 22px;
+      right: 18px;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(20,16,18,0.55);
+      color: #fff;
+      font-size: 20px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+    }
+
+    /* ---------- Loading ---------- */
+    #loader {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(251,246,241,0.85);
+      z-index: 30;
+      flex-direction: column;
+      gap: 14px;
+      color: var(--deep);
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+    }
+    .spinner {
+      width: 38px; height: 38px;
+      border: 3px solid rgba(217,138,150,0.3);
+      border-top-color: var(--rose);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { opacity: 0 !important; pointer-events: none !important; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Landing / cover -->
+  <section id="landing">
+    <div class="eyebrow">Together with their families</div>
+    <h1 id="cover-names">Alex<span class="amp">and</span>Jordan</h1>
+    <div class="date" id="cover-date">Saturday, the Twelfth of September</div>
+    <div class="venue" id="cover-venue">Sunset Garden Estate</div>
+
+    <div class="divider"></div>
+
+    <button class="btn" id="enter-ar">
+      <span class="icon">✨</span><span id="enter-label">View Invitation in AR</span>
+    </button>
+    <div id="preview-hint">Drag to rotate the preview</div>
+    <p id="subnote">Point your phone at the floor or a table, then tap to place the invitation.</p>
+  </section>
+
+  <!-- AR overlay UI -->
+  <div id="overlay">
+    <button id="ar-exit" aria-label="Exit AR">✕</button>
+    <div id="ar-hint">Move your phone to scan a flat surface…</div>
+    <div id="ar-actions">
+      <a class="pill primary" id="rsvp-btn" target="_blank" rel="noopener">💌 RSVP</a>
+      <a class="pill" id="map-btn" target="_blank" rel="noopener">📍 Directions</a>
+      <button class="pill" id="replace-btn">↺ Move</button>
+    </div>
+  </div>
+
+  <div id="loader"><div class="spinner"></div><div>Preparing magic…</div></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
