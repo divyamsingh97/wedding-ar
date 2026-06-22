@@ -231,9 +231,15 @@ function buildInvitationForExport() {
   pedestal.position.y = 0.025;
   group.add(pedestal);
 
-  // decorative base ring on the floor
-  const baseRing = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.012, 16, 90), gold.clone());
-  baseRing.rotation.x = Math.PI / 2;
+  // decorative base ring on the floor (flat halo, matches the live version)
+  const baseRing = new THREE.Mesh(
+    new THREE.RingGeometry(0.26, 0.34, 64),
+    new THREE.MeshStandardMaterial({
+      color: CONFIG.theme.gold, emissive: CONFIG.theme.gold, emissiveIntensity: 0.5,
+      metalness: 0.6, roughness: 0.4, transparent: true, opacity: 0.5, side: THREE.DoubleSide
+    })
+  );
+  baseRing.rotation.x = -Math.PI / 2;
   baseRing.position.y = 0.003;
   group.add(baseRing);
 
@@ -259,8 +265,21 @@ function buildInvitationForExport() {
       roughness: 0.9, metalness: 0.0, transparent: true, side: THREE.DoubleSide
     })
   );
-  banner.position.y = 0.45;
+  banner.position.y = 0.42;
   group.add(banner);
+
+  // static hearts (Quick Look can't run our animated sprites, so bake a few in)
+  const htex = heartTexture();
+  for (let i = 0; i < 10; i++) {
+    const h = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.05, 0.05),
+      new THREE.MeshStandardMaterial({ map: htex, emissive: 0xe0697a, emissiveMap: htex, emissiveIntensity: 0.6, transparent: true, side: THREE.DoubleSide, roughness: 1, metalness: 0 })
+    );
+    const a = Math.random() * Math.PI * 2;
+    const r = 0.1 + Math.random() * 0.12;
+    h.position.set(Math.cos(a) * r, 0.1 + Math.random() * 0.45, Math.sin(a) * r);
+    group.add(h);
+  }
 
   // a few static decorative petals
   const ptex = petalTexture();
@@ -544,6 +563,8 @@ function enterPreview() {
     controls.maxDistance = 2.4;
     controls.maxPolarAngle = Math.PI / 1.9;
     controls.target.set(0, 0.3, 0);
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 1.2;
   }
   controls.enabled = true;
   camera.position.set(0, 0.5, 1.3);
@@ -633,6 +654,12 @@ function quickLookSupported() {
   return a.relList && a.relList.supports && a.relList.supports('ar');
 }
 
+function isIOS() {
+  // iPhone/iPod, plus iPadOS (which reports as MacIntel with touch)
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 function launchQuickLook() {
   if (usdzUrl) { openQuickLook(); return; }
   // model not ready yet — show loader and open as soon as it is
@@ -679,11 +706,12 @@ async function main() {
       startAudio(); // unlock audio on user gesture
       startAR();
     });
-  } else if (quickLookSupported()) {
-    // iPhone / iPad — native AR Quick Look (USDZ)
+  } else if (quickLookSupported() || isIOS()) {
+    // iPhone / iPad — native AR Quick Look (USDZ). Works in Safari;
+    // Chrome/Edge/Firefox on iOS also use WebKit so we offer it there too.
     enterLabel.textContent = 'View in Your Space (AR)';
     document.getElementById('subnote').textContent =
-      'Tap to place the invitation in your room, then move your phone to position it.';
+      'Tap to place the invitation in your room, then drag with one finger to rotate it.';
     prepareUSDZ(); // build the model in the background so the tap is instant
     enterBtn.addEventListener('click', () => {
       startAudio();
