@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { USDZExporter } from 'three/addons/exporters/USDZExporter.js';
 
 /* =====================================================================
    1. EDIT YOUR WEDDING DETAILS HERE
    ===================================================================== */
 const CONFIG = {
-  name1: 'Divyam',
-  name2: 'Kripi',
-  dateText: 'November 21, 2026',
-  venue: 'Best Western Resort Country Club, Manesar',
+  name1: 'Alex',
+  name2: 'Jordan',
+  dateText: 'September 12, 2026',
+  venue: 'Sunset Garden Estate',
   rsvpUrl: 'https://example.com/rsvp',            // ← your RSVP form / site
   mapUrl: 'https://maps.google.com/?q=Sunset+Garden+Estate', // ← venue map
   musicUrl: '',   // ← optional: path to an .mp3 (e.g. './music.mp3'). Leave '' to use built-in soft chimes.
@@ -172,6 +173,13 @@ function buildInvitation() {
 }
 
 function makeTextBanner() {
+  const tex = bannerTexture();
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.25), mat);
+  return plane;
+}
+
+function bannerTexture() {
   const w = 1024, h = 512;
   const cvs = document.createElement('canvas');
   cvs.width = w; cvs.height = h;
@@ -207,9 +215,68 @@ function makeTextBanner() {
   const tex = new THREE.CanvasTexture(cvs);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.25), mat);
-  return plane;
+  return tex;
+}
+
+/* ---- Static, exporter-friendly invitation for iOS AR Quick Look (USDZ) ---- */
+function buildInvitationForExport() {
+  const group = new THREE.Group();
+  const gold = new THREE.MeshStandardMaterial({ color: CONFIG.theme.gold, metalness: 1.0, roughness: 0.18 });
+
+  // pedestal
+  const pedestal = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.09, 0.05, 32),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.4 })
+  );
+  pedestal.position.y = 0.025;
+  group.add(pedestal);
+
+  // decorative base ring on the floor
+  const baseRing = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.012, 16, 90), gold.clone());
+  baseRing.rotation.x = Math.PI / 2;
+  baseRing.position.y = 0.003;
+  group.add(baseRing);
+
+  // interlocked wedding rings
+  const ringGeo = new THREE.TorusGeometry(0.07, 0.014, 24, 80);
+  const ringA = new THREE.Mesh(ringGeo, gold);
+  ringA.rotation.x = Math.PI / 2; ringA.position.set(-0.045, 0.16, 0);
+  const ringB = new THREE.Mesh(ringGeo, gold);
+  ringB.rotation.x = Math.PI / 2; ringB.rotation.y = 0.5; ringB.position.set(0.045, 0.16, 0);
+  const diamond = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.018, 0),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.05 })
+  );
+  diamond.position.set(-0.045, 0.245, 0);
+  group.add(ringA, ringB, diamond);
+
+  // name banner (emissive so it stays bright in Quick Look)
+  const tex = bannerTexture();
+  const banner = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.5, 0.25),
+    new THREE.MeshStandardMaterial({
+      map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.85,
+      roughness: 0.9, metalness: 0.0, transparent: true, side: THREE.DoubleSide
+    })
+  );
+  banner.position.y = 0.45;
+  group.add(banner);
+
+  // a few static decorative petals
+  const ptex = petalTexture();
+  for (let i = 0; i < 12; i++) {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.045, 0.045),
+      new THREE.MeshStandardMaterial({ map: ptex, transparent: true, side: THREE.DoubleSide, roughness: 1, metalness: 0 })
+    );
+    const a = Math.random() * Math.PI * 2;
+    const r = 0.12 + Math.random() * 0.18;
+    m.position.set(Math.cos(a) * r, 0.03 + Math.random() * 0.42, Math.sin(a) * r);
+    m.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    group.add(m);
+  }
+
+  return group;
 }
 
 function makePetals(count) {
@@ -540,7 +607,61 @@ function easeOutBack(x) {
 }
 
 /* =====================================================================
-   9. BOOTSTRAP + capability detection
+   9. iOS AR QUICK LOOK (USDZ) — true in-room AR for iPhone/iPad
+   ===================================================================== */
+let usdzUrl = null;
+let usdzBuilding = false;
+
+async function prepareUSDZ() {
+  if (usdzUrl || usdzBuilding) return;
+  usdzBuilding = true;
+  try {
+    const exporter = new USDZExporter();
+    const grp = buildInvitationForExport();
+    const result = await exporter.parse(grp);
+    const blob = new Blob([result], { type: 'model/vnd.usdz+zip' });
+    usdzUrl = URL.createObjectURL(blob);
+  } catch (e) {
+    console.error('USDZ export failed:', e);
+  } finally {
+    usdzBuilding = false;
+  }
+}
+
+function quickLookSupported() {
+  const a = document.createElement('a');
+  return a.relList && a.relList.supports && a.relList.supports('ar');
+}
+
+function launchQuickLook() {
+  if (usdzUrl) { openQuickLook(); return; }
+  // model not ready yet — show loader and open as soon as it is
+  loader.style.display = 'flex';
+  const waitId = setInterval(() => {
+    if (usdzUrl) {
+      clearInterval(waitId);
+      loader.style.display = 'none';
+      openQuickLook();
+    }
+  }, 120);
+  if (!usdzBuilding) prepareUSDZ();
+}
+
+function openQuickLook() {
+  const link = document.createElement('a');
+  link.rel = 'ar';
+  link.href = usdzUrl;
+  // Quick Look requires an <img> child inside the anchor
+  const img = document.createElement('img');
+  img.style.display = 'none';
+  link.appendChild(img);
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => { if (link.parentNode) link.parentNode.removeChild(link); }, 8000);
+}
+
+/* =====================================================================
+   10. BOOTSTRAP + capability detection
    ===================================================================== */
 async function main() {
   initEngine();
@@ -552,13 +673,24 @@ async function main() {
   }
 
   if (arSupported) {
+    // Android Chrome etc. — full WebXR surface placement
     enterLabel.textContent = 'View Invitation in AR';
     enterBtn.addEventListener('click', () => {
       startAudio(); // unlock audio on user gesture
       startAR();
     });
+  } else if (quickLookSupported()) {
+    // iPhone / iPad — native AR Quick Look (USDZ)
+    enterLabel.textContent = 'View in Your Space (AR)';
+    document.getElementById('subnote').textContent =
+      'Tap to place the invitation in your room, then move your phone to position it.';
+    prepareUSDZ(); // build the model in the background so the tap is instant
+    enterBtn.addEventListener('click', () => {
+      startAudio();
+      launchQuickLook();
+    });
   } else {
-    // iOS Safari / desktop: no WebXR placement — offer the 3D preview instead
+    // Desktop / unsupported — interactive 3D invitation
     enterLabel.textContent = 'View 3D Invitation';
     document.getElementById('subnote').innerHTML =
       'Your browser doesn’t support in-room AR placement. Enjoy the interactive 3D invitation — drag to explore.';
